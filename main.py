@@ -7,6 +7,7 @@ from datetime import datetime
 from dateutil.parser import parse
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from langgraph.graph import Graph
 from pydantic import BaseModel
 from cdp_langchain.utils import CdpAgentkitWrapper
 from cdp_langchain.agent_toolkits import CdpToolkit
@@ -47,6 +48,11 @@ class BetRequest(BaseModel):
     urls: list = []  # Optional list of data source URLs for LLM to query
 
 
+#  Request model for validate_market API
+class ValidateMarketRequest(BaseModel):
+    description: str  # Market description as input
+
+
 # LLM judgment function
 def judge_bet(request: BetRequest):
     # If the user did not provide URLs, let the LLM automatically search for relevant data sources
@@ -70,7 +76,7 @@ def judge_bet(request: BetRequest):
 
 
 # Analyze the market description
-def analyze_market(description: str) -> dict:
+def analyze_market(description: str):
     """
     Analyze the market description and validate its components.
 
@@ -80,6 +86,8 @@ def analyze_market(description: str) -> dict:
     Returns:
         dict: Analysis results including completeness, outcomes, and verifiability.
     """
+    steps = []
+
     analysis_result = {
         "has_due_date": False,
         "due_date": None,
@@ -131,13 +139,24 @@ def analyze_market(description: str) -> dict:
                 analysis_result["due_date"] = None
         else:
             analysis_result["due_date"] = None
-
+        # Record Step 1
+        steps.append({
+            "step": 1,
+            "input": description,
+            "output": analysis_result
+        })
         # Proceed only if both due date and two outcomes are valid
         if has_due_date and has_two_outcomes:
             # Step 2: Use TavilySearchUtil to perform an online search
             search_results = search_util.search(description)
             content_list = search_util.extract_content(search_results)
             combined_content = " ".join(content_list)
+
+            steps.append({
+                "step": 2,
+                "input": description,
+                "output": combined_content
+            })
 
             # Step 3: Pass the search results to LLM to judge if the bet is valid
             validation_query = f"""
@@ -163,13 +182,57 @@ def analyze_market(description: str) -> dict:
                 analysis_result["is_valid"] = True
             else:
                 analysis_result["is_valid"] = False
+
+            # Record Step 3
+            steps.append({
+                "step": 3,
+                "input": {"description": description, "combined_content": combined_content},
+                "output": analysis_result["is_valid"]
+            })
         else:
             analysis_result["is_valid"] = False
+            steps.append({
+                "step": "Step 2: Perform online search",
+                "input": description,
+                "output": "Skipped due to incomplete analysis result."
+            })
 
     except Exception as e:
         print(f"Error during analysis: {e}")
+        error_message = f"Error during analysis: {e}"
+        steps.append({
+            "step": "Step 1: Analyze market description",
+            "input": description,
+            "error": error_message
+        })
     print(analysis_result)
-    return analysis_result
+    return analysis_result, steps
+
+
+# Define the validate_market API
+@app.post("/validate_market/")
+async def validate_market(request: ValidateMarketRequest):
+    """
+    Validate the market description and return analysis results and steps.
+
+    Args:
+        request (ValidateMarketRequest): Contains the market description.
+
+    Returns:
+        dict: Includes analysis results and detailed processing steps.
+    """
+    try:
+        # Call analyze_market function to process the description
+        analyze_result, steps = analyze_market(request.description)
+
+        # Return the analysis result and steps
+        return {
+            "analyze_result": analyze_result,
+            "steps": steps
+        }
+    except Exception as e:
+        # Handle and return any exceptions
+        raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
 
 # Helper function to parse and standardize the due date
@@ -222,5 +285,6 @@ async def judge_bet_endpoint(request: BetRequest):
 if __name__ == "__main__":
     # Example market description
     test_description = "Will Bitcoin's price rise above $40,000 by November 18, 2024, 3:30 PM?"
-    result = analyze_market(test_description)
+    result, steps = analyze_market(test_description)
     print("Market Analysis Result:", result)
+    print("Market Analysis steps", steps)
