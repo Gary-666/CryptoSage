@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from config.config import agent_executor
+from llm.feedback import collect_feedback_and_improve
 from llm.validate import validating_market
 from twitter.tweet import fetch_and_validate_replies, get_is_fetch_and_validate_active, \
     set_is_fetch_and_validate_active, get_fetch_and_validate_stop_event, post_tweet
@@ -34,6 +35,54 @@ class FetchAndAnalyzeRepliesRequest(BaseModel):
 class PostTweetRequest(BaseModel):
     address: str
     message: str
+
+class FeedbackRequest(BaseModel):
+    message_json: str
+
+# Helper function to parse and standardize the due date
+def parse_due_date(due_date_str: str) -> datetime:
+    """
+    Parse and standardize a due date string into a datetime object.
+
+    Args:
+        due_date_str (str): Raw due date string.
+
+    Returns:
+        datetime: Parsed and standardized datetime object.
+    """
+    try:
+        parsed_date = parse(due_date_str, fuzzy=True)
+        return parsed_date
+    except Exception as e:
+        print(f"Error parsing due date: {e}")
+        return None
+
+
+# URL extraction function (extract URLs from search results)
+def extract_urls(search_results):
+    """
+    Extract URLs from search result content using regular expressions.
+
+    Args:
+        search_results (str): Search result content as a single string.
+
+    Returns:
+        list: List of extracted URLs.
+    """
+    # Regular expression to match URLs inside parentheses or as plain text
+    url_pattern = r"https?://[^\s\)]+"
+    urls = re.findall(url_pattern, search_results)
+    return urls
+
+
+async def run_fetch_and_validate_task(user_id):
+    """
+    Run fetch and validate task in an asyncio loop.
+    """
+    try:
+        await fetch_and_validate_replies(user_id)
+    finally:
+        set_is_fetch_and_validate_active(False)
 
 
 def judge_bet(request: BetRequest):
@@ -82,43 +131,6 @@ async def validate_market(request: ValidateMarketRequest):
         # Handle and return any exceptions
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
-
-# Helper function to parse and standardize the due date
-def parse_due_date(due_date_str: str) -> datetime:
-    """
-    Parse and standardize a due date string into a datetime object.
-
-    Args:
-        due_date_str (str): Raw due date string.
-
-    Returns:
-        datetime: Parsed and standardized datetime object.
-    """
-    try:
-        parsed_date = parse(due_date_str, fuzzy=True)
-        return parsed_date
-    except Exception as e:
-        print(f"Error parsing due date: {e}")
-        return None
-
-
-# URL extraction function (extract URLs from search results)
-def extract_urls(search_results):
-    """
-    Extract URLs from search result content using regular expressions.
-
-    Args:
-        search_results (str): Search result content as a single string.
-
-    Returns:
-        list: List of extracted URLs.
-    """
-    # Regular expression to match URLs inside parentheses or as plain text
-    url_pattern = r"https?://[^\s\)]+"
-    urls = re.findall(url_pattern, search_results)
-    return urls
-
-
 # FastAPI endpoint
 @app.post("/judge_bet")
 async def judge_bet_endpoint(request: BetRequest):
@@ -157,16 +169,6 @@ async def start_fetch_and_validate_replies(request: FetchAndAnalyzeRepliesReques
     return {"status": 200, "message": "Fetch and validate process started."}
 
 
-async def run_fetch_and_validate_task(user_id):
-    """
-    Run fetch and validate task in an asyncio loop.
-    """
-    try:
-        await fetch_and_validate_replies(user_id)
-    finally:
-        set_is_fetch_and_validate_active(False)
-
-
 @app.post("/stop_fetch_and_validate")
 async def stop_fetch_and_validate():
     """
@@ -200,16 +202,22 @@ async def post_tweet_endpoint(request: PostTweetRequest):
     )
 
     result = await post_tweet(message)
-    return result
+    return {"status": 200, "message": "success", "data": result}
 
 
-# Built-in tests
-if __name__ == "__main__":
-    # Example market description
-    test_description = "Will Bitcoin's price rise above $40,000 by November 18, 2024, 3:30 PM?"
+@app.post("/feed_back")
+async def feed_back_endpoint(request: FeedbackRequest):
+    message = request.message
+    await collect_feedback_and_improve(message)
+    return {"status": 200, "message": "success"}
 
-
-    judge_bet(BetRequest(description=test_description))
+# # Built-in tests
+# if __name__ == "__main__":
+#     # Example market description
+#     test_description = "Will Bitcoin's price rise above $40,000 by November 18, 2024, 3:30 PM?"
+#
+#
+#     judge_bet(BetRequest(description=test_description))
     # result, steps = validating_market(test_description, agent_executor, search_util)
     # print("Market Analysis Result:", result)
     # print("Market Analysis steps", steps)

@@ -9,58 +9,77 @@ from config.config import openai_api_key
 ai_client = OpenAI(api_key=openai_api_key)
 
 
-# Collect feedback and generate improved validation prompts
-async def collect_feedback_and_improve():
+# In-memory storage for user feedback
+feedback_storage = []
+
+
+async def collect_feedback_and_improve(new_feedback: dict):
     """
-    Collect feedback on AI-generated market descriptions and use it to generate
-    improved validation prompts for the LLM.
+    Collect user feedback and generate improved validation prompts.
+
+    Args:
+        new_feedback (dict): A dictionary containing user feedback.
+            Example:
+            {
+                "clarity": "The outcomes seem ambiguous.",
+                "suggestion": "Please include more guidance on the due date format."
+            }
 
     Returns:
         dict: A dictionary containing the original feedback and the improved validation prompt.
+        Example output:
+        {
+            "feedback_summary": "The outcomes are too vague, and the due date is unclear.",
+            "improved_prompt": "Ensure the market description specifies clear outcomes and includes a precise due date in ISO format."
+        }
     """
     try:
-        # Send a generation request to get feedback prompts
+        # Add the new feedback to the in-memory storage
+        feedback_storage.append(new_feedback)
+
+        # Construct a dynamic prompt by aggregating all feedback
+        feedback_messages = "\n".join([
+            f"Feedback {i + 1}:\n"
+            f"1. Clarity: {fb['clarity']}\n"
+            f"2. Suggestion: {fb['suggestion']}\n"
+            for i, fb in enumerate(feedback_storage)
+        ])
+
+        # Send the aggregated feedback to the AI model to generate a new prompt
         response = ai_client.chat.completions.create(
             model="o1-model",
             messages=[
                 {
                     "role": "system",
                     "content": """
-                    You are an AI assistant helping refine market descriptions for bets. 
+                    You are an AI assistant refining validation prompts based on user feedback.
                     Users provide feedback on two aspects:
                     1. How clear and specific the description is.
                     2. Suggestions for improvement.
 
-                    Please format your output as a JSON object with two fields:
-                    - "feedback_summary": A concise summary (10-30 words) of the feedback.
+                    Based on the provided feedback, generate a concise JSON object with:
+                    - "feedback_summary": A summary of common issues (10-30 words).
                     - "improved_prompt": A revised validation prompt based on the feedback.
 
-                    Example:
+                    Example output:
                     {
                         "feedback_summary": "The outcomes are too vague, and the due date is unclear.",
                         "improved_prompt": "Ensure the market description specifies clear outcomes and includes a precise due date in ISO format."
                     }
-
-                    Only output the JSON object. No additional text.
                     """
                 },
                 {
                     "role": "user",
-                    "content": """
-                    User Feedback:
-                    1. "The outcomes seem ambiguous. It's not clear what counts as 'success'."
-                    2. "Please include more guidance on what format the due date should follow."
-                    """
+                    "content": f"Here is the accumulated feedback:\n{feedback_messages}\nPlease generate an improved validation prompt."
                 }
             ]
         )
 
-        # Extract the response
+        # Extract the improved prompt from the response
         content = response.choices[0].message.content
-
-        # Parse the content as JSON
         cleaned_content = re.sub(r"```(?:json)?", "", content).strip()
         feedback_data = json.loads(cleaned_content)
+
         return feedback_data
 
     except Exception as e:
