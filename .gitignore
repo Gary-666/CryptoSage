@@ -3,3 +3,4 @@ __pycache__
 .idea
 cookies.json
 main2.py".env" 
+.DS_Store
