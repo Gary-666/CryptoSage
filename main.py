@@ -1,19 +1,20 @@
 # main.py
 
+import re
 from datetime import datetime
 
 from dateutil.parser import parse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from config.config import agent_executor
 from llm.validate import validating_market
+from twitter.tweet import fetch_and_validate_replies, get_is_fetch_and_validate_active, \
+    set_is_fetch_and_validate_active, get_fetch_and_validate_stop_event, post_tweet
 from utils.tavily_search import search_util
-
 # FastAPI application
 app = FastAPI()
-
 
 # Request data model
 class BetRequest(BaseModel):
@@ -26,26 +27,35 @@ class ValidateMarketRequest(BaseModel):
     description: str  # Market description as input
 
 
-# LLM judgment function
+class FetchAndAnalyzeRepliesRequest(BaseModel):
+    user_id: str
+
+
+class PostTweetRequest(BaseModel):
+    address: str
+    message: str
+
+
 def judge_bet(request: BetRequest):
-    # If the user did not provide URLs, let the LLM automatically search for relevant data sources
-    if not request.urls:
-        search_query = f"Please provide relevant data source URLs for '{request.description}'"
-        search_event = agent_executor.stream({"messages": [("user", search_query)]}, stream_mode="values")
-        search_results = [event["messages"][-1].content for event in search_event]
-        request.urls = extract_urls(search_results[0])
+    """
+    Use Tavily search to directly determine the correctness of a bet.
 
-    # Retrieve content from each URL
-    evidence = []
-    for url in request.urls:
-        fetch_query = f"Please retrieve information from the following URL: {url}"
-        fetch_event = agent_executor.stream({"messages": [("user", fetch_query)]}, stream_mode="values")
-        content = [event["messages"][-1].content for event in fetch_event]
-        evidence.append(content[0])
+    Args:
+        request (BetRequest): Contains the bet description and optional URLs.
 
-    # Determine the result (True / False) based on evidence and description
-    verdict = determine_verdict(evidence, request.description)
-    return verdict
+    Returns:
+        bool: True if the bet is deemed valid, False otherwise.
+    """
+    try:
+        # Use Tavily search to perform judgment based on description
+        print("Performing Tavily search for:", request.description)
+        keywords = ["rise", "fall", "increase", "decrease", "exceed", "below"]  # Example keywords for market bets
+        is_valid = search_util.search_and_judge(query=request.description, keywords=keywords)
+        print(is_valid)
+        return is_valid
+    except Exception as e:
+        print(f"Error in judge_bet: {e}")
+        return False
 
 
 @app.post("/validate_market")
@@ -92,20 +102,20 @@ def parse_due_date(due_date_str: str) -> datetime:
         return None
 
 
-# Verdict determination function
-def determine_verdict(evidence, description):
-    # Simplified logic (determines verdict based on whether evidence contains specific keywords)
-    if any(keyword in " ".join(evidence) for keyword in ["晴", "上涨"]):  # "晴" = sunny, "上涨" = increase
-        return True
-    return False
-
-
 # URL extraction function (extract URLs from search results)
 def extract_urls(search_results):
-    urls = []
-    for result in search_results.split():
-        if result.startswith("http"):
-            urls.append(result)
+    """
+    Extract URLs from search result content using regular expressions.
+
+    Args:
+        search_results (str): Search result content as a single string.
+
+    Returns:
+        list: List of extracted URLs.
+    """
+    # Regular expression to match URLs inside parentheses or as plain text
+    url_pattern = r"https?://[^\s\)]+"
+    urls = re.findall(url_pattern, search_results)
     return urls
 
 
@@ -119,10 +129,87 @@ async def judge_bet_endpoint(request: BetRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/start_fetch_and_validate")
+async def start_fetch_and_validate_replies(request: FetchAndAnalyzeRepliesRequest, background_tasks: BackgroundTasks):
+    """
+    Start fetching and validating replies as a background task.
+
+    Args:
+        user_id (str): The user ID to monitor.
+        background_tasks (BackgroundTasks): FastAPI's background task manager.
+
+    Returns:
+        dict: Status message.
+    """
+    is_fetch_and_validate_active = get_is_fetch_and_validate_active()
+    stop_fetch_and_validate_stop_event = get_fetch_and_validate_stop_event()
+
+    user_id = request.user_id
+
+    if is_fetch_and_validate_active:
+        return {"status": 400, "message": "Fetch and validate process is already running."}
+
+    set_is_fetch_and_validate_active(True)
+    stop_fetch_and_validate_stop_event.clear()  # Ensure stop event is clear
+
+    # Start the background task
+    background_tasks.add_task(run_fetch_and_validate_task, user_id)
+    return {"status": 200, "message": "Fetch and validate process started."}
+
+
+async def run_fetch_and_validate_task(user_id):
+    """
+    Run fetch and validate task in an asyncio loop.
+    """
+    try:
+        await fetch_and_validate_replies(user_id)
+    finally:
+        set_is_fetch_and_validate_active(False)
+
+
+@app.post("/stop_fetch_and_validate")
+async def stop_fetch_and_validate():
+    """
+    Stop the fetch and validate background process.
+
+    Returns:
+        dict: Status message.
+    """
+    is_fetch_and_validate_active = get_is_fetch_and_validate_active()
+
+    if not is_fetch_and_validate_active:
+        return {"status": 400, "message": "Fetch and validate process is not running."}
+
+    fetch_and_validate_stop_evnet = get_fetch_and_validate_stop_event()
+    fetch_and_validate_stop_evnet.set()  # Signal to stop the task
+    set_is_fetch_and_validate_active(False)
+    return {"status": 200, "message": "Fetch and validate process stopped."}
+
+
+@app.post("/post_tweet")
+async def post_tweet_endpoint(request: PostTweetRequest):
+    # get local time
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    message = (
+        f"🎉 Create Bet Successfully! 🎉\n"
+        f"🏠 Contract Address: {request.address}\n"
+        f"📜 Message: {request.message}\n"
+        f"🔗 Explore: our product url\n"
+        f"⏰ Timestamp: {current_time}\n\n"
+        f"Powered by our platform 🚀"
+    )
+
+    result = await post_tweet(message)
+    return result
+
+
 # Built-in tests
 if __name__ == "__main__":
     # Example market description
     test_description = "Will Bitcoin's price rise above $40,000 by November 18, 2024, 3:30 PM?"
-    result, steps = validating_market(test_description, agent_executor, search_util)
-    print("Market Analysis Result:", result)
-    print("Market Analysis steps", steps)
+
+
+    judge_bet(BetRequest(description=test_description))
+    # result, steps = validating_market(test_description, agent_executor, search_util)
+    # print("Market Analysis Result:", result)
+    # print("Market Analysis steps", steps)

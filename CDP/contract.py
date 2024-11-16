@@ -1,13 +1,5 @@
-import json
-from cdp_init import *
-from typing import List, Dict, Any
-import os
-from decimal import Decimal
-from typing import Union
-from web3 import Web3
-from web3.exceptions import ContractLogicError
-from cdp.errors import ApiError, UnsupportedAssetError
-from config.config import cdp_api_key_name, cdp_api_key_private_key
+
+from CDP.cdp_init import init_cdp_agent_kit
 
 factory_abi = [
     {
@@ -598,7 +590,6 @@ agent_wallet = cdp.wallet
 # contract_addr = '0xB93138dA9c65e85d6d97c795029F1D269d512b65'
 contract_addr = '0x11165e9afa37d76c6d032961c63d14ee8efd68c7'
 
-
 # def call_contract(contract_address: str, method: str, args: dict):
 #     invocation = agent_wallet.invoke_contract(
 #         contract_address=contract_address, contract_abi=abi, method=method, args=args)
@@ -627,6 +618,4 @@ def set_bet_result(address: str, result: bool):
         contract_address=address, abi=abi, method='setResult', args=args)
     # res = invocation.wait()
     # print(res)
-
-
 

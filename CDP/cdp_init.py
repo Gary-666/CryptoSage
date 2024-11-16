@@ -8,7 +8,7 @@ def init_cdp_agent_kit() -> CdpAgentkitWrapper:
     conf = {
         "api_key_name": cdp_api_key_name,
         "api_key_private_key": cdp_api_key_private_key,
-        "network_id": "base-sepolia",
+        "network_id": "polygon-mainnet",
     }
     if os.path.exists("wallet.json"):
         wallet = json.load(open("wallet.json", "r"))
@@ -19,8 +19,8 @@ def init_cdp_agent_kit() -> CdpAgentkitWrapper:
     if not os.path.exists("wallet.json"):
         wallet = cdp.export_wallet()
         json.dump(wallet, open("wallet.json", "w"))
-        faucet = cdp.wallet.faucet()
-        faucet.wait()
-        print(faucet)
+        # faucet = CDP.wallet.faucet()
+        # faucet.wait()
+        # print(faucet)
 
     return cdp
