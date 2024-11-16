@@ -606,6 +606,7 @@ def create_bet(message, token, min_value, judge, end_time):
 
     invocation = agent_wallet.invoke_contract(
         contract_address=contract_addr, abi=factory_abi, method='createBet', args=args)
+    print(invocation)
     # res = invocation.wait()
 
 
