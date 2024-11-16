@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from config.config import agent_executor
 from llm.validate import validating_market
 from twitter.tweet import fetch_and_validate_replies, get_is_fetch_and_validate_active, \
-    set_is_fetch_and_validate_active, get_fetch_and_validate_stop_event
+    set_is_fetch_and_validate_active, get_fetch_and_validate_stop_event, post_tweet
 from utils.tavily_search import search_util
 # FastAPI application
 app = FastAPI()
@@ -29,6 +29,11 @@ class ValidateMarketRequest(BaseModel):
 
 class FetchAndAnalyzeRepliesRequest(BaseModel):
     user_id: str
+
+
+class PostTweetRequest(BaseModel):
+    address: str
+    message: str
 
 
 def judge_bet(request: BetRequest):
@@ -161,6 +166,7 @@ async def run_fetch_and_validate_task(user_id):
     finally:
         set_is_fetch_and_validate_active(False)
 
+
 @app.post("/stop_fetch_and_validate")
 async def stop_fetch_and_validate():
     """
@@ -180,10 +186,28 @@ async def stop_fetch_and_validate():
     return {"status": 200, "message": "Fetch and validate process stopped."}
 
 
+@app.post("/post_tweet")
+async def post_tweet_endpoint(request: PostTweetRequest):
+    # get local time
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    message = (
+        f"🎉 Create Bet Successfully! 🎉\n"
+        f"🏠 Contract Address: {request.address}\n"
+        f"📜 Message: {request.message}\n"
+        f"🔗 Explore: our product url\n"
+        f"⏰ Timestamp: {current_time}\n\n"
+        f"Powered by our platform 🚀"
+    )
+
+    result = await post_tweet(message)
+    return result
+
+
 # Built-in tests
 if __name__ == "__main__":
     # Example market description
     test_description = "Will Bitcoin's price rise above $40,000 by November 18, 2024, 3:30 PM?"
+
 
     judge_bet(BetRequest(description=test_description))
     # result, steps = validating_market(test_description, agent_executor, search_util)

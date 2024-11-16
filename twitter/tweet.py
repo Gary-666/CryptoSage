@@ -36,24 +36,29 @@ def set_is_fetch_and_validate_active(active: bool):
     global _is_fetch_and_validate_active
     _is_fetch_and_validate_active = active
 
-async def post_tweet(content, image_paths=None):
-    await login()  # Ensure login first
-    try:
-        if image_paths:
-            media_ids = [await client.upload_media(path) for path in image_paths]
-            await client.create_tweet(text=content, media_ids=media_ids)
-        else:
-            await client.create_tweet(text=content)
-        # print successfully!!!
-        print("\n" + "=" * 30)
-        print("Tweet sent successfully")
-        print("=" * 30 + "\n")
-        return True
-    except Exception as e:
-        print("\n" + "=" * 30)
-        print(f"Tweet send failed, please try again later: {e}")
-        print("=" * 30 + "\n")
-        return False
+
+# resent
+async def post_tweet(content, image_paths=None, max_retries=10, retry_interval=120):
+    await login()  # ensure login
+    retries = 0
+    while retries < max_retries:
+        try:
+            if image_paths:
+                media_ids = [await client.upload_media(path) for path in image_paths]
+                await client.create_tweet(text=content, media_ids=media_ids)
+            else:
+                await client.create_tweet(text=content)
+            print("\n" + "=" * 30)
+            print("Tweet sent successfully")
+            print("=" * 30 + "\n")
+            return {"success": True, "message": "Tweet sent successfully"}
+        except Exception as e:
+            retries += 1
+            print("\n" + "=" * 30)
+            print(f"Attempt {retries} failed. Retrying in {retry_interval} seconds: {e}")
+            print("=" * 30 + "\n")
+            await asyncio.sleep(retry_interval)
+    return {"success": False, "message": "Failed to send tweet after multiple attempts"}
 
 
 async def fetch_and_validate_replies(user_id):
@@ -119,17 +124,16 @@ async def fetch_and_validate_replies(user_id):
                                 # bet_created = await create_bet(reply)
                                 bet_created = True
                                 if bet_created:
-                                    # create_bet(processed_text, "0x0000000000000000000000000000000000000000", 1, "0x0000000000000000000000000000000000000000", timestamp)
+                                    contract_address = create_bet(processed_text, "0x0000000000000000000000000000000000000000", 1, "0x0000000000000000000000000000000000000000", timestamp)
 
-                                    # 开始轮询，直到 reply.reply 成功
-                                    while True:
-                                        try:
-                                            await reply.reply("Create Bet Successfully! Url is as below:")
-                                            print(f"Replied to user: {reply.user.screen_name}")
-                                            break  # 成功后退出循环
-                                        except Exception as e:
-                                            print(f"Failed to send reply, retrying in 120 seconds: {e}")
-                                            await asyncio.sleep(120)  # 等待 120 秒后重试
+                                    # while True:
+                                    #     try:
+                                    #         await reply.reply(f"Create Bet Successfully! Url is as below: {contract_address}")
+                                    #         print(f"Replied to user: {reply.user.screen_name}")
+                                    #         break
+                                    #     except Exception as e:
+                                    #         print(f"Failed to send reply, retrying in 120 seconds: {e}")
+                                    #         await asyncio.sleep(120)
 
                                 else:
                                     print("Failed to create bet. Skipping reply.")

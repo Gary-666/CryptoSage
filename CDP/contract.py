@@ -238,6 +238,11 @@ def create_bet(message, token, min_value, judge, end_time):
     res = invocation.wait()
     print(res)
 
+    # 提取新合约地址（假设返回值包含部署的合约地址）
+    new_contract_address = res.get("result")  # 根据具体的返回结构获取合约地址
+    print(f"Newly Deployed Contract Address: {new_contract_address}")
+
+    return new_contract_address
 
 # create_bet("test",
 #            "0x0000000000000000000000000000000000000000",
