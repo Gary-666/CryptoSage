@@ -1,7 +1,14 @@
 from cdp_langchain.utils import CdpAgentkitWrapper
-from config.config import cdp_api_key_name, cdp_api_key_private_key
 import json
 import os
+
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+cdp_api_key_name = os.getenv('CDP_API_KEY_NAME')
+cdp_api_key_private_key = os.getenv('CDP_API_KEY_PRIVATE_KEY')
 
 
 def init_cdp_agent_kit() -> CdpAgentkitWrapper:

@@ -2,6 +2,7 @@ import re
 import json
 from datetime import datetime
 from dateutil.parser import parse
+from llm.feedback import collect_feedback_and_improve
 
 
 # Analyze the market description
