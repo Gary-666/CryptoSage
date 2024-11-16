@@ -1,5 +1,6 @@
 # main.py
-import asyncio
+
+import re
 from datetime import datetime
 
 from dateutil.parser import parse
@@ -25,29 +26,31 @@ class BetRequest(BaseModel):
 class ValidateMarketRequest(BaseModel):
     description: str  # Market description as input
 
+
 class FetchAndAnalyzeRepliesRequest(BaseModel):
     user_id: str
 
-# LLM judgment function
+
 def judge_bet(request: BetRequest):
-    # If the user did not provide URLs, let the LLM automatically search for relevant data sources
-    if not request.urls:
-        search_query = f"Please provide relevant data source URLs for '{request.description}'"
-        search_event = agent_executor.stream({"messages": [("user", search_query)]}, stream_mode="values")
-        search_results = [event["messages"][-1].content for event in search_event]
-        request.urls = extract_urls(search_results[0])
+    """
+    Use Tavily search to directly determine the correctness of a bet.
 
-    # Retrieve content from each URL
-    evidence = []
-    for url in request.urls:
-        fetch_query = f"Please retrieve information from the following URL: {url}"
-        fetch_event = agent_executor.stream({"messages": [("user", fetch_query)]}, stream_mode="values")
-        content = [event["messages"][-1].content for event in fetch_event]
-        evidence.append(content[0])
+    Args:
+        request (BetRequest): Contains the bet description and optional URLs.
 
-    # Determine the result (True / False) based on evidence and description
-    verdict = determine_verdict(evidence, request.description)
-    return verdict
+    Returns:
+        bool: True if the bet is deemed valid, False otherwise.
+    """
+    try:
+        # Use Tavily search to perform judgment based on description
+        print("Performing Tavily search for:", request.description)
+        keywords = ["rise", "fall", "increase", "decrease", "exceed", "below"]  # Example keywords for market bets
+        is_valid = search_util.search_and_judge(query=request.description, keywords=keywords)
+        print(is_valid)
+        return is_valid
+    except Exception as e:
+        print(f"Error in judge_bet: {e}")
+        return False
 
 
 @app.post("/validate_market")
@@ -94,20 +97,20 @@ def parse_due_date(due_date_str: str) -> datetime:
         return None
 
 
-# Verdict determination function
-def determine_verdict(evidence, description):
-    # Simplified logic (determines verdict based on whether evidence contains specific keywords)
-    if any(keyword in " ".join(evidence) for keyword in ["晴", "上涨"]):  # "晴" = sunny, "上涨" = increase
-        return True
-    return False
-
-
 # URL extraction function (extract URLs from search results)
 def extract_urls(search_results):
-    urls = []
-    for result in search_results.split():
-        if result.startswith("http"):
-            urls.append(result)
+    """
+    Extract URLs from search result content using regular expressions.
+
+    Args:
+        search_results (str): Search result content as a single string.
+
+    Returns:
+        list: List of extracted URLs.
+    """
+    # Regular expression to match URLs inside parentheses or as plain text
+    url_pattern = r"https?://[^\s\)]+"
+    urls = re.findall(url_pattern, search_results)
     return urls
 
 
@@ -181,6 +184,8 @@ async def stop_fetch_and_validate():
 if __name__ == "__main__":
     # Example market description
     test_description = "Will Bitcoin's price rise above $40,000 by November 18, 2024, 3:30 PM?"
-    result, steps = validating_market(test_description, agent_executor, search_util)
-    print("Market Analysis Result:", result)
-    print("Market Analysis steps", steps)
+
+    judge_bet(BetRequest(description=test_description))
+    # result, steps = validating_market(test_description, agent_executor, search_util)
+    # print("Market Analysis Result:", result)
+    # print("Market Analysis steps", steps)

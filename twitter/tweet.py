@@ -2,10 +2,12 @@ import asyncio
 import os
 from datetime import datetime
 
+from CDP.contract import create_bet
 from config.config import redis_client, agent_executor
 from llm.validate import validating_market
 from twitter.client import login, client
 from utils.tavily_search import search_util
+from utils.time_util import iso_to_timestamp
 
 # Global variable to stop the loop
 _fetch_and_validate_stop_event = asyncio.Event()
@@ -101,73 +103,37 @@ async def fetch_and_validate_replies(user_id):
                             continue
 
                         print("Reply:", reply.full_text)
+                        # extract comment text
+                        full_text = reply.full_text
 
-                        # 处理评论
-                        if "@" in reply.full_text:
-                            result, _ = validating_market(reply.full_text, agent_executor, search_util)
+                        # process comments
+                        if "@" in full_text:
+                            processed_text = " ".join(
+                                [word for word in full_text.split() if not word.startswith("@")]
+                            )
+
+                            result, _ = validating_market(processed_text, agent_executor, search_util)
                             if result.get("is_valid", False):
+                                timestamp = iso_to_timestamp(result.get("due_date"))
                                 # create_bet
                                 # bet_created = await create_bet(reply)
                                 bet_created = True
                                 if bet_created:
-                                    try:
-                                        await reply.reply("Create Bet Successfully!" + "Url is as below: ")
-                                        print(f"Replied to user: {reply.user.screen_name}")
-                                    except Exception as e:
-                                        print(f"Failed to send reply: {e}")
-                                        await asyncio.sleep(10)
+                                    # create_bet(processed_text, "0x0000000000000000000000000000000000000000", 1, "0x0000000000000000000000000000000000000000", timestamp)
+
+                                    # 开始轮询，直到 reply.reply 成功
+                                    while True:
+                                        try:
+                                            await reply.reply("Create Bet Successfully! Url is as below:")
+                                            print(f"Replied to user: {reply.user.screen_name}")
+                                            break  # 成功后退出循环
+                                        except Exception as e:
+                                            print(f"Failed to send reply, retrying in 120 seconds: {e}")
+                                            await asyncio.sleep(120)  # 等待 120 秒后重试
+
                                 else:
                                     print("Failed to create bet. Skipping reply.")
                         await asyncio.sleep(1)
-
-                    #     # analyze and process comment
-                    #     # response = await analyze_reply_for_transfer(reply.full_text)
-                    #     response = None
-                    #     # Check if an address and amount are present
-                    #     if response:
-                    #         to_address = response.get("to_address")
-                    #         amount = response.get("amount")
-                    #         currency_type = response.get("currency_type")
-                    #         reply_content = response.get("reply_content")
-                    #
-                    #         # transfer the money
-                    #         if to_address and amount and currency_type:
-                    #             try:
-                    #                 amount = int(amount)
-                    #                 # Get user_id from the reply
-                    #                 to_user_id = reply.user.id
-                    #                 user_claim_key = f"user_claimed:{to_user_id}"
-                    #
-                    #                 # Check if user has already claimed the reward
-                    #                 has_claimed = await redis_client.get(user_claim_key)
-                    #                 if not has_claimed:
-                    #                     print(f"User {to_user_id} has not already claimed the reward.")
-                    #                     # # continue
-                    #                     # if currency_type == "CKB":
-                    #                     #     if CKB_MIN <= amount <= CKB_MAX:
-                    #                     #         transfer_result = await transfer_ckb(to_address, amount)
-                    #                     # elif currency_type == "Seal":
-                    #                     #     if SEAL_MIN <= amount <= SEAL_MAX:
-                    #                     #         transfer_result = await transfer_token(to_address, amount, SEAL_XUDT_ARGS)
-                    #                     # else:
-                    #                     #     print("Unrecognized currency type in response:", currency_type)
-                    #                     #     continue
-                    #                     # Mark user as claimed in Redis
-                    #                     await redis_client.set(user_claim_key, "claimed")
-                    #                     # print("Transfer Result:", transfer_result)
-                    #             except Exception as e:
-                    #                 print(f"Transfer error:{e}")
-                    #         if reply_content:
-                    #             try:
-                    #                 await reply.reply(reply_content)
-                    #             except Exception as e:
-                    #                 print(f"Failed to send reply, retrying: {e}")
-                    #                 await asyncio.sleep(60)  # Delay before retrying
-                    #
-                    #     await asyncio.sleep(30)
-                    #     now_count += 1
-                    # if not is_fetch_and_analyze_active:
-                    #     return
                     if replies.next:
                         try:
                             replies = await replies.next()

@@ -7,6 +7,9 @@ from cdp_langchain.utils import CdpAgentkitWrapper
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
+from CDP.cdp_init import cdp_api_key_private_key, cdp_api_key_name
+
+from CDP.contract import cdp
 
 # Load environment variables
 load_dotenv()
@@ -29,19 +32,18 @@ REDIS_SNI = os.getenv("REDIS_SNI", None)
 discord_token = os.getenv("DISCORD_TOKEN", "")
 
 openai_api_key = os.getenv('OPENAI_API_KEY')
-cdp_api_key_name = os.getenv('CDP_API_KEY_NAME')
-cdp_api_key_private_key = os.getenv('CDP_API_KEY_PRIVATE_KEY')
+cdp_api_key_name = cdp_api_key_name
+cdp_api_key_private_key = cdp_api_key_private_key
 tavily_api_key = os.getenv("TAVILY_API_KEY")
 
 
 # Initialize CDP Wrapper and Toolkit
-# cdp = CdpAgentkitWrapper(api_key_name=cdp_api_key_name, api_key_private_key=cdp_api_key_private_key)
-# toolkit = CdpToolkit.from_cdp_agentkit_wrapper(cdp)
+toolkit = CdpToolkit.from_cdp_agentkit_wrapper(cdp)
 
 # Initialize LLM and create Agent
-# llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=openai_api_key)
-# tools = toolkit.get_tools()
-# agent_executor = create_react_agent(llm, tools)
+llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=openai_api_key)
+tools = toolkit.get_tools()
+agent_executor = create_react_agent(llm, tools)
 
 
 # set SSL 和 SNI

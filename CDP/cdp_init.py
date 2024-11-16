@@ -1,7 +1,16 @@
 from cdp_langchain.utils import CdpAgentkitWrapper
-from config.config import cdp_api_key_name, cdp_api_key_private_key
+from dotenv import load_dotenv
+
 import json
 import os
+
+# Load environment variables
+load_dotenv()
+
+openai_api_key = os.getenv('OPENAI_API_KEY')
+cdp_api_key_name = os.getenv('CDP_API_KEY_NAME')
+cdp_api_key_private_key = os.getenv('CDP_API_KEY_PRIVATE_KEY')
+tavily_api_key = os.getenv("TAVILY_API_KEY")
 
 
 def init_cdp_agent_kit() -> CdpAgentkitWrapper:
@@ -19,7 +28,7 @@ def init_cdp_agent_kit() -> CdpAgentkitWrapper:
     if not os.path.exists("wallet.json"):
         wallet = cdp.export_wallet()
         json.dump(wallet, open("wallet.json", "w"))
-        # faucet = cdp.wallet.faucet()
+        # faucet = CDP.wallet.faucet()
         # faucet.wait()
         # print(faucet)
 
