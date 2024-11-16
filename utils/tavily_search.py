@@ -6,9 +6,10 @@ from dotenv import load_dotenv
 from tavily import TavilyClient
 from typing import List, Dict
 
+from config.config import tavily_api_key
+
 # Load environment variables
 load_dotenv()
-tavily_api_key = os.getenv("TAVILY_API_KEY")
 
 
 class TavilySearchUtil:
@@ -85,6 +86,9 @@ class TavilySearchUtil:
         combined_content = " ".join(content_list)
         return any(keyword in combined_content for keyword in keywords)
 
+
+# Initialize Tavily Search Utility
+search_util = TavilySearchUtil(api_key=tavily_api_key)
 
 # Example usage:
 if __name__ == "__main__":
