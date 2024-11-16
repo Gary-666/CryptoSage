@@ -1,11 +1,16 @@
 package internal
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/xixiwang12138/exermon/db"
 	"gorm.io/gorm"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -109,11 +114,49 @@ func (i *BetIndexer) IndexBet() error {
 			}
 
 			log.Printf("Bet inserted: %v", bet.Address)
+
+			err = i.notifyBet(bet)
+			if err != nil {
+				log.Printf("Failed to notify bet: %v", err)
+				continue
+			}
+			log.Printf("Bet notified: %v", bet.Address)
 		}
 	}
 
 }
 
-func (i *BetIndexer) notifyBet(bet *Bet) {
+type PostTweetRequest struct {
+	Address string `json:"address"`
+	Message string `json:"message"`
+}
 
+func (i *BetIndexer) notifyBet(bet *Bet) error {
+	requestData := &PostTweetRequest{
+		Address: bet.Address,
+		Message: bet.Message,
+	}
+
+	requestBody, err := json.Marshal(requestData)
+	if err != nil {
+		fmt.Printf("Error marshaling request data: %v\n", err)
+		return err
+	}
+
+	url := fmt.Sprintf("%s/post_tweet", AIServiceURL)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		fmt.Printf("Error making POST request: %v\n", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Error: received status code %d\n", resp.StatusCode)
+		body, _ := ioutil.ReadAll(resp.Body)
+		fmt.Printf("Response body: %s\n", string(body))
+		return err
+	}
+
+	return nil
 }

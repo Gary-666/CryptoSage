@@ -1,9 +1,9 @@
 package main
 
 import (
+	"cryptosage-listener/internal"
 	"github.com/xixiwang12138/exermon/db"
 	"github.com/xixiwang12138/exermon/elog"
-	"lazybet-listener/internal"
 	"os"
 )
 
