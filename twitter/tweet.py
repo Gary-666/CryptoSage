@@ -111,32 +111,32 @@ async def fetch_and_validate_replies(user_id):
                         # extract comment text
                         full_text = reply.full_text
 
-                        # process comments
-                        if "@" in full_text:
-                            processed_text = " ".join(
-                                [word for word in full_text.split() if not word.startswith("@")]
-                            )
+                        # # process comments
+                        # if "@" in full_text:
+                        # processed_text = " ".join(
+                        #     [word for word in full_text.split() if not word.startswith("@")]
+                        # )
 
-                            result, _ = validating_market(processed_text, agent_executor, search_util)
-                            if result.get("is_valid", False):
-                                timestamp = iso_to_timestamp(result.get("due_date"))
-                                # create_bet
-                                # bet_created = await create_bet(reply)
-                                bet_created = True
-                                if bet_created:
-                                    contract_address = create_bet(processed_text, "0x0000000000000000000000000000000000000000", 1, "0x0000000000000000000000000000000000000000", timestamp)
+                        result, _ = validating_market(full_text, agent_executor, search_util)
+                        if result.get("is_valid", False):
+                            timestamp = iso_to_timestamp(result.get("due_date"))
+                            # create_bet
+                            # bet_created = await create_bet(reply)
+                            bet_created = True
+                            if bet_created:
+                                contract_address = create_bet(full_text, "0x0000000000000000000000000000000000000000", 1, "0x0000000000000000000000000000000000000000", timestamp)
 
-                                    # while True:
-                                    #     try:
-                                    #         await reply.reply(f"Create Bet Successfully! Url is as below: {contract_address}")
-                                    #         print(f"Replied to user: {reply.user.screen_name}")
-                                    #         break
-                                    #     except Exception as e:
-                                    #         print(f"Failed to send reply, retrying in 120 seconds: {e}")
-                                    #         await asyncio.sleep(120)
+                                # while True:
+                                #     try:
+                                #         await reply.reply(f"Create Bet Successfully! Url is as below: {contract_address}")
+                                #         print(f"Replied to user: {reply.user.screen_name}")
+                                #         break
+                                #     except Exception as e:
+                                #         print(f"Failed to send reply, retrying in 120 seconds: {e}")
+                                #         await asyncio.sleep(120)
 
-                                else:
-                                    print("Failed to create bet. Skipping reply.")
+                            else:
+                                print("Failed to create bet. Skipping reply.")
                         await asyncio.sleep(1)
                     if replies.next:
                         try:

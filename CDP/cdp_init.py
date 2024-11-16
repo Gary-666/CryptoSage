@@ -15,7 +15,7 @@ def init_cdp_agent_kit() -> CdpAgentkitWrapper:
     conf = {
         "api_key_name": cdp_api_key_name,
         "api_key_private_key": cdp_api_key_private_key,
-        "network_id": "polygon-mainnet",
+        "network_id": "base-sepolia",
     }
     if os.path.exists("wallet.json"):
         wallet = json.load(open("wallet.json", "r"))
