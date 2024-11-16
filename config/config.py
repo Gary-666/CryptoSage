@@ -35,13 +35,13 @@ tavily_api_key = os.getenv("TAVILY_API_KEY")
 
 
 # Initialize CDP Wrapper and Toolkit
-cdp = CdpAgentkitWrapper(api_key_name=cdp_api_key_name, api_key_private_key=cdp_api_key_private_key)
-toolkit = CdpToolkit.from_cdp_agentkit_wrapper(cdp)
+# cdp = CdpAgentkitWrapper(api_key_name=cdp_api_key_name, api_key_private_key=cdp_api_key_private_key)
+# toolkit = CdpToolkit.from_cdp_agentkit_wrapper(cdp)
 
 # Initialize LLM and create Agent
-llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=openai_api_key)
-tools = toolkit.get_tools()
-agent_executor = create_react_agent(llm, tools)
+# llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=openai_api_key)
+# tools = toolkit.get_tools()
+# agent_executor = create_react_agent(llm, tools)
 
 
 # set SSL 和 SNI
