@@ -1,19 +1,19 @@
 # main.py
-
+import asyncio
 from datetime import datetime
 
 from dateutil.parser import parse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from config.config import agent_executor
 from llm.validate import validating_market
+from twitter.tweet import fetch_and_validate_replies, get_is_fetch_and_validate_active, \
+    set_is_fetch_and_validate_active, get_fetch_and_validate_stop_event
 from utils.tavily_search import search_util
-
 # FastAPI application
 app = FastAPI()
-
 
 # Request data model
 class BetRequest(BaseModel):
@@ -25,6 +25,8 @@ class BetRequest(BaseModel):
 class ValidateMarketRequest(BaseModel):
     description: str  # Market description as input
 
+class FetchAndAnalyzeRepliesRequest(BaseModel):
+    user_id: str
 
 # LLM judgment function
 def judge_bet(request: BetRequest):
@@ -117,6 +119,62 @@ async def judge_bet_endpoint(request: BetRequest):
         return {"verdict": verdict}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/start_fetch_and_validate")
+async def start_fetch_and_validate_replies(request: FetchAndAnalyzeRepliesRequest, background_tasks: BackgroundTasks):
+    """
+    Start fetching and validating replies as a background task.
+
+    Args:
+        user_id (str): The user ID to monitor.
+        background_tasks (BackgroundTasks): FastAPI's background task manager.
+
+    Returns:
+        dict: Status message.
+    """
+    is_fetch_and_validate_active = get_is_fetch_and_validate_active()
+    stop_fetch_and_validate_stop_event = get_fetch_and_validate_stop_event()
+
+    user_id = request.user_id
+
+    if is_fetch_and_validate_active:
+        return {"status": 400, "message": "Fetch and validate process is already running."}
+
+    set_is_fetch_and_validate_active(True)
+    stop_fetch_and_validate_stop_event.clear()  # Ensure stop event is clear
+
+    # Start the background task
+    background_tasks.add_task(run_fetch_and_validate_task, user_id)
+    return {"status": 200, "message": "Fetch and validate process started."}
+
+
+async def run_fetch_and_validate_task(user_id):
+    """
+    Run fetch and validate task in an asyncio loop.
+    """
+    try:
+        await fetch_and_validate_replies(user_id)
+    finally:
+        set_is_fetch_and_validate_active(False)
+
+@app.post("/stop_fetch_and_validate")
+async def stop_fetch_and_validate():
+    """
+    Stop the fetch and validate background process.
+
+    Returns:
+        dict: Status message.
+    """
+    is_fetch_and_validate_active = get_is_fetch_and_validate_active()
+
+    if not is_fetch_and_validate_active:
+        return {"status": 400, "message": "Fetch and validate process is not running."}
+
+    fetch_and_validate_stop_evnet = get_fetch_and_validate_stop_event()
+    fetch_and_validate_stop_evnet.set()  # Signal to stop the task
+    set_is_fetch_and_validate_active(False)
+    return {"status": 200, "message": "Fetch and validate process stopped."}
 
 
 # Built-in tests
