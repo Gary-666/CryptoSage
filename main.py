@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from CDP.contract import set_bet_result
 from config.config import agent_executor
 from llm.feedback import collect_feedback_and_improve
+from llm.introduce import generate_self_intro_tweet
 from llm.validate import validating_market
 from twitter.tweet import fetch_and_validate_replies, get_is_fetch_and_validate_active, \
     set_is_fetch_and_validate_active, get_fetch_and_validate_stop_event, post_tweet
@@ -214,13 +215,11 @@ async def feed_back_endpoint(request: FeedbackRequest):
     await collect_feedback_and_improve(message)
     return {"status": 200, "message": "success"}
 
-# # Built-in tests
-# if __name__ == "__main__":
-#     # Example market description
-#     test_description = "Will Bitcoin's price rise above $40,000 by November 18, 2024, 3:30 PM?"
-#
-#
-#     judge_bet(BetRequest(description=test_description))
-    # result, steps = validating_market(test_description, agent_executor, search_util)
-    # print("Market Analysis Result:", result)
-    # print("Market Analysis steps", steps)
+
+@app.post("/self_introduction")
+async def generate_self_intro_tweet_endpoint():
+    result = await generate_self_intro_tweet()
+    await post_tweet(result)
+    return {"status": 200, "message": "success"}
+
+
