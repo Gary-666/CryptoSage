@@ -610,9 +610,9 @@ def create_bet(message, token, min_value, judge, end_time):
     # res = invocation.wait()
 
 
-def set_bet_result(address: str, result: bool):
+def set_bet_result(address: str, result: int):
     args = {
-        '_result': result
+        '_result': str(result)
     }
 
     invocation = agent_wallet.invoke_contract(

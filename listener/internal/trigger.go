@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const AIServiceURL = "http://localhost:8000"
+const AIServiceURL = "http://localhost:8001"
 
 type AITrigger struct {
 	betRepo *db.BaseDao[Bet]
@@ -33,6 +33,7 @@ func (t *AITrigger) scanBet() ([]*Bet, error) {
 }
 
 type BetRequest struct {
+    Address     string   `json:"address"`
 	Description string   `json:"description"`
 	Urls        []string `json:"urls"`
 }
@@ -46,6 +47,7 @@ func (t *AITrigger) triggerAI(bet *Bet) error {
 	println("Trigger AI for bet: ", bet.Address)
 
 	requestData := BetRequest{
+	    Address: bet.Address,
 		Description: bet.Message,
 		Urls:        []string{},
 	}

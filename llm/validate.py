@@ -79,6 +79,7 @@ def validating_market(description: str, agent_executor, search_util):
                 "due_date": analysis_result["due_date"],
             }
         })
+        print(steps[0])
         # Proceed only if both due date and two outcomes are valid
         if has_due_date and has_two_outcomes:
             # Step 2: Use TavilySearchUtil to perform an online search
@@ -94,6 +95,7 @@ def validating_market(description: str, agent_executor, search_util):
                     "has_two_outcomes": analysis_result["has_two_outcomes"],
                 }
             })
+            print(steps[1])
 
             # Step 3: Pass the search results to LLM to judge if the bet is valid
             validation_query = f"""
@@ -128,6 +130,7 @@ def validating_market(description: str, agent_executor, search_util):
                     "is_verifable": analysis_result["is_valid"],
                 }
             })
+            print(steps[2])
         else:
             analysis_result["is_valid"] = False
             steps.append({

@@ -8,6 +8,7 @@ from dateutil.parser import parse
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
+from CDP.contract import set_bet_result
 from config.config import agent_executor
 from llm.feedback import collect_feedback_and_improve
 from llm.validate import validating_market
@@ -21,7 +22,7 @@ app = FastAPI()
 class BetRequest(BaseModel):
     description: str  # Bet description (e.g., weather in Bangkok tomorrow)
     urls: list = []  # Optional list of data source URLs for LLM to query
-
+    address: str
 
 #  Request model for validate_market API
 class ValidateMarketRequest(BaseModel):
@@ -101,6 +102,8 @@ def judge_bet(request: BetRequest):
         keywords = ["rise", "fall", "increase", "decrease", "exceed", "below"]  # Example keywords for market bets
         is_valid = search_util.search_and_judge(query=request.description, keywords=keywords)
         print(is_valid)
+        result = int(is_valid) + 1
+        set_bet_result(request.address, result)
         return is_valid
     except Exception as e:
         print(f"Error in judge_bet: {e}")

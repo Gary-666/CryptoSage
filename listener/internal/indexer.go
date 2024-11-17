@@ -29,7 +29,8 @@ const (
 		],"name":"BetCreated","type":"event"}
 	]`
 
-	contractAddress = "0x11165e9afa37d76c6d032961c63d14ee8efd68c7"
+// 	contractAddress = "0x11165e9afa37d76c6d032961c63d14ee8efd68c7"
+    contractAddress = "0x67a3b0e1efd7e967b28b6b76f172eb4b3294c425"
 )
 
 type BetIndexer struct {

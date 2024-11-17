@@ -38,7 +38,7 @@ def set_is_fetch_and_validate_active(active: bool):
 
 
 # resent
-async def post_tweet(content, image_paths=None, max_retries=10, retry_interval=120):
+async def post_tweet(content, image_paths=None, max_retries=10, retry_interval=20):
     await login()  # ensure login
     retries = 0
     while retries < max_retries:
@@ -88,17 +88,17 @@ async def fetch_and_validate_replies(user_id):
                 if not last_processed_time:
                     last_processed_time = initial_timestamp
                     await redis_client.set(f"csb_last_processed_time:{tweet_id}", last_processed_time)
-                    print(initial_timestamp)
+                    # print(initial_timestamp)
                 else:
                     last_processed_time = float(last_processed_time)
-                    print(last_processed_time)
+                    # print(last_processed_time)
 
                 replies = tweet.replies
-                print(replies)
+                # print(replies)
 
                 while replies:
                     for reply in replies:
-                        print(reply.text)
+                        # print(reply.text)
                         if not _is_fetch_and_validate_active:
                             return
                         reply_timestamp = reply.created_at_datetime.timestamp()
@@ -141,7 +141,7 @@ async def fetch_and_validate_replies(user_id):
                     if replies.next:
                         try:
                             replies = await replies.next()
-                            await asyncio.sleep(10)
+                            await asyncio.sleep(60)
                         except Exception as e:
                             print(f"replies.next() error: {e} ")
                             break
